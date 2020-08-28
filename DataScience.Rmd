@@ -1,0 +1,143 @@
+---
+title: "DataScience-Week2"
+author: "Kelly Avila"
+date: "19/8/2020"
+output: html_document
+---
+
+The data was download from Coursera Material. The folder which will be analyzed correspond to en_US folder which has three files.
+
+## Load libraries
+```{r}
+library(NLP)
+library(tm)
+library(RColorBrewer)
+library(stringi)
+library(ngram)
+library(gridExtra)
+```
+
+## Load Data
+
+```{r}
+con <- file("en_US.news.txt", open="r")
+News <- readLines(con); close(con)
+
+con <- file("en_US.blogs.txt", open="r")
+Blogs <- readLines(con); close(con) 
+
+con <- file("en_US.twitter.txt", open="r")
+Twitter <- readLines(con); close(con)
+```
+
+## Summary of the Data
+
+```{r}
+file_stat<- function(text_file, lines) {
+f_size <- file.info(text_file)[1]/1024^2
+nchars <- lapply(lines, nchar)
+maxchars <- which.max(nchars)
+word_count <- sum(sapply(strsplit(lines, "\\s+"), length))
+return(c(text_file, format(round(as.double(f_size), 2), nsmall=2), length(lines),maxchars, word_count))
+}
+
+NewsStat<- file_stat("en_US.news.txt", News)
+BlogsStat <- file_stat("en_US.blogs.txt", Blogs)
+TwitterStat<- file_stat("en_US.twitter.txt", Twitter)
+
+test_summary <- c(NewsStat, BlogsStat,TwitterStat)
+
+df <- data.frame(matrix(unlist(test_summary), nrow=3, byrow=T))
+colnames(df) <- c("Text_file", "Size(MB)", "Line_Count", "Max Line Length", "Words_Count")
+print(df)
+```
+
+# High frecuency words
+
+```{r}
+make_Corpus<- function(test_file) {
+gen_corp<- paste(test_file, collapse=" ")
+gen_corp <- VectorSource(gen_corp)
+gen_corp <- Corpus(gen_corp)
+}
+    
+clean_corp <- function(corp_data) {
+
+corp_data <- tm_map(corp_data, removeNumbers)
+corp_data <- tm_map(corp_data, content_transformer(tolower))
+corp_data <- tm_map(corp_data, removeWords, stopwords("english"))
+corp_data <- tm_map(corp_data, removePunctuation)
+corp_data <- tm_map(corp_data, stripWhitespace)
+return (corp_data)
+}
+
+high_freq_words <- function (corp_data) {
+term_sparse <- DocumentTermMatrix(corp_data)
+term_matrix <- as.matrix(term_sparse)   
+freq_words <- colSums(term_matrix)
+freq_words <- as.data.frame(sort(freq_words, decreasing=TRUE))
+freq_words$word <- rownames(freq_words)
+colnames(freq_words) <- c("Frequency","word")
+return (freq_words)
+}
+```
+
+#Graphics
+
+## In news
+```{r}
+NEWS_text1 <-sample(News, round(0.1*length(News)), replace = F)
+US_news_corpus <- make_Corpus(NEWS_text1)
+US_news_corpus <- clean_corp(US_news_corpus)
+US_news_most_used_word <- high_freq_words(US_news_corpus)
+US_news_most_used_word1<- US_news_most_used_word[1:5,]
+```
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+p <-ggplot(data=US_news_most_used_word1, aes(x=reorder(word,Frequency), y=Frequency,
+                    fill=factor(reorder(word,-Frequency))))+ geom_bar(stat="identity") 
+p + xlab("Word") +labs(title = "Most Frequent words:US News") +theme(legend.title=element_blank()) + coord_flip()
+```
+
+## In blogs
+
+```{r}
+blogs_text1<-sample(Blogs, round(0.1*length(Blogs)), replace = F)
+blogs_corpus <- make_Corpus(blogs_text1)
+blogs_corpus <- clean_corp(blogs_corpus)
+blogs_most_used_word <- high_freq_words(blogs_corpus) 
+blogs_most_used_word1<- blogs_most_used_word[1:5,]
+```  
+```{r}
+p<-ggplot(data=blogs_most_used_word1, aes(x=reorder(word,Frequency), y=Frequency,
+                    fill=factor(reorder(word,-Frequency))))+ geom_bar(stat="identity") 
+p + xlab("Word") +labs(title = "Most Frequent words : US blogs") +theme(legend.title=element_blank()) + coord_flip()
+```
+
+## In Twitter 
+```{r}
+Twit_text1<-sample(Twitter, round(0.1*length(Twitter)), replace = F)
+twitter_corpus <- make_Corpus(Twit_text1)
+twitter_corpus <- clean_corp(twitter_corpus)
+twitter_most_used_word <- high_freq_words(twitter_corpus)
+twitter_most_used_word1<- twitter_most_used_word[1:5,]
+```
+
+```{r}
+p<-ggplot(data=twitter_most_used_word1, aes(x=reorder(word,Frequency), y=Frequency,
+                    fill=factor(reorder(word,-Frequency))))+ geom_bar(stat="identity") 
+p + xlab("Word") +labs(title = "Most Frequent words:Twitter") +theme(legend.title=element_blank()) + coord_flip()
+```  
+
+## Other types of graphics can be made to visualize the analyzed data. In this report, it will be included an example of worldcloud graphics, only for twitter dataset, as an example.
+
+```{r}
+library(wordcloud)
+wordcloud(twitter_most_used_word$word[1:100], twitter_most_used_word$Frequency[1:100],
+              colors=brewer.pal(8, "Dark2"))
+```
+
